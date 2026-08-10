@@ -103,6 +103,15 @@
   .meta-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
   .meta-item { font-size: 12px; color: #8b95aa; }
   .meta-item b { color: #e6e9ef; font-size: 13px; display: block; margin-top: 2px; }
+
+  select.btn, input.btn {
+    background: #0f172a; color: #e6e9ef; border: 1px solid #2a3a52; border-radius: 12px;
+    padding: 9px 10px; font-size: 13px; font-weight: 600;
+  }
+  .btn.active { background: #14321f; border-color: rgba(16,185,129,0.4); color: #6ee7b7; }
+  .btn.danger { background: #321414; border-color: rgba(248,113,113,0.4); color: #fca5a5; }
+  .log-list { margin-top: 12px; font-size: 12px; color: #8b95aa; max-height: 160px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+  .log-list div { border-bottom: 1px solid #1a2333; padding-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -193,6 +202,36 @@
           </tbody>
         </table>
       </div>
+    </div>
+
+    <div class="card" style="margin-top: 18px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px; flex-wrap: wrap;">
+        <div>
+          <div class="section-title">Auto-Loop</div>
+          <div class="section-sub">On every completed candle: refetch the last 5, recalculate, and (if enabled) replace the pending buy/sell limit orders with fresh SL/TP</div>
+        </div>
+        <div class="actions">
+          <select class="btn" id="timeframeSelect">
+            <option value="M1">M1</option>
+            <option value="M5">M5</option>
+            <option value="M15" selected>M15</option>
+            <option value="M30">M30</option>
+            <option value="H1">H1</option>
+            <option value="H4">H4</option>
+            <option value="D1">D1</option>
+          </select>
+          <input class="btn" id="volumeInput" type="number" min="0.01" step="0.01" value="0.01" style="width:80px;" title="Lot size (live backend only)" />
+          <button class="btn" id="autoToggleBtn" onclick="toggleAutoLoop()">Start Auto-Loop</button>
+        </div>
+      </div>
+
+      <div class="banner" id="autoBanner"></div>
+
+      <div class="meta-row">
+        <div class="meta-item">Status <b id="autoStatusText">Stopped</b></div>
+      </div>
+
+      <div class="log-list" id="autoLog"></div>
     </div>
 
     <div class="card" style="margin-top: 18px;">
@@ -309,6 +348,12 @@ function renderAccount(d){
   document.getElementById('updated').textContent = 'Last updated: ' + u.toLocaleString();
 }
 
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
 function renderPositions(list){
   const tbody = document.getElementById('positionsBody');
   if (!list || !list.length) {
@@ -319,8 +364,8 @@ function renderPositions(list){
     const typeLabel = (String(p.type||'').toLowerCase().includes('buy')) ? 'BUY' : (String(p.type||'').toLowerCase().includes('sell') ? 'SELL' : String(p.type));
     const cls = typeLabel.toLowerCase().includes('buy') ? 'buy' : 'sell';
     return `<tr>
-      <td>${p.ticket ?? '—'}</td>
-      <td><span class="pill ${cls}">${typeLabel}</span></td>
+      <td>${escapeHtml(p.ticket ?? '—')}</td>
+      <td><span class="pill ${cls}">${escapeHtml(typeLabel)}</span></td>
       <td>${fmt(p.volume, 2)}</td>
       <td>${fmt(p.price_open, 5)}</td>
       <td>${fmt(p.sl, 5)}</td>
@@ -378,26 +423,121 @@ async function loadPrediction(){
   }
 }
 
-async function refresh(){
-  try {
-    const [a, p] = await Promise.all([
-      fetch('/api/account'),
-      fetch('/api/positions')
-    ]);
-    if (!a.ok || !p.ok) throw new Error('no backend');
-    const ad = await a.json();
-    const pd = await p.json();
-    if (ad.error) throw new Error(ad.error);
-    renderAccount(ad);
-    renderPositions(pd);
-  } catch (err) {
-    document.getElementById('updated').textContent = 'Last updated: — (no backend reachable, showing demo prediction only)';
-  }
-  await loadPrediction();
+async function fetchJSON(url, options){
+  const res = await fetch(url, options);
+  if (!res.ok) throw new Error('http_' + res.status);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
 }
 
-refresh();
-setInterval(refresh, 5000);
+async function fetchAutoStatus(){
+  try {
+    return await fetchJSON('/api/auto/status');
+  } catch (err) {
+    return null;
+  }
+}
+
+function renderAutoStatus(s){
+  const btn = document.getElementById('autoToggleBtn');
+  const statusEl = document.getElementById('autoStatusText');
+  const logEl = document.getElementById('autoLog');
+  const selects = [document.getElementById('timeframeSelect'), document.getElementById('volumeInput')];
+
+  if (!s) {
+    btn.disabled = true;
+    btn.textContent = 'Start Auto-Loop';
+    btn.classList.remove('active');
+    statusEl.textContent = 'Unavailable (no backend reachable)';
+    logEl.innerHTML = '';
+    return;
+  }
+
+  btn.disabled = false;
+  btn.textContent = s.running ? 'Stop Auto-Loop' : 'Start Auto-Loop';
+  btn.classList.toggle('active', !!s.running);
+  selects.forEach(el => { el.disabled = !!s.running; });
+
+  const mode = s.live_trading ? 'LIVE ORDERS' : 'DRY RUN';
+  statusEl.textContent = s.running ? `Running (${s.timeframe}) — ${mode}` : 'Stopped';
+
+  logEl.innerHTML = (s.log || []).map(l => `<div>${escapeHtml(l)}</div>`).join('');
+}
+
+async function toggleAutoLoop(){
+  const btn = document.getElementById('autoToggleBtn');
+  btn.disabled = true;
+  try {
+    const status = await fetchAutoStatus();
+    if (status && status.running) {
+      await fetch('/api/auto/stop', { method: 'POST' });
+    } else {
+      if (status && status.live_trading) {
+        const ok = confirm(
+          'LIVE TRADING is enabled on this backend.\n\n' +
+          'Starting the auto-loop will place REAL buy-limit and sell-limit pending orders ' +
+          'with stop-loss/take-profit on your MT5 account every time a candle closes on the ' +
+          'selected timeframe, and will replace them again on the next candle. Continue?'
+        );
+        if (!ok) return;
+      }
+      const timeframe = document.getElementById('timeframeSelect').value;
+      const volume = parseFloat(document.getElementById('volumeInput').value) || 0.01;
+      await fetchJSON('/api/auto/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timeframe, volume }),
+      });
+    }
+  } catch (err) {
+    alert('Could not toggle auto-loop: ' + err.message);
+  } finally {
+    renderAutoStatus(await fetchAutoStatus());
+  }
+}
+
+async function refresh(){
+  // Account and positions are fetched independently: a backend (like
+  // test_mt5.py) that only implements some endpoints should still get
+  // to render whatever it does support, instead of an all-or-nothing UI.
+  let accountOk = false;
+  try {
+    renderAccount(await fetchJSON('/api/account'));
+    accountOk = true;
+  } catch (err) {
+    // handled by the fallback message below
+  }
+  try {
+    renderPositions(await fetchJSON('/api/positions'));
+  } catch (err) {
+    // positions endpoint optional; leave table as-is
+  }
+  if (!accountOk) {
+    document.getElementById('updated').textContent = 'Last updated: — (no backend reachable, showing demo prediction only)';
+  }
+
+  const autoStatus = await fetchAutoStatus();
+  renderAutoStatus(autoStatus);
+
+  if (autoStatus && autoStatus.running && autoStatus.last_levels) {
+    // While the auto-loop is running, the prediction panel tracks its
+    // last completed-candle calculation instead of polling /api/prediction
+    // independently, so the two stay in sync.
+    setBanner(autoStatus.live_trading ? null : 'Auto-loop running in DRY RUN — set MT5_AUTOTRADE_ENABLED=1 on the backend to place live orders.');
+    if (autoStatus.last_candles) {
+      renderPrediction(autoStatus.last_candles, autoStatus.last_levels);
+    }
+  } else {
+    await loadPrediction();
+  }
+}
+
+async function refreshLoop(){
+  await refresh();
+  setTimeout(refreshLoop, 5000);
+}
+refreshLoop();
 </script>
 </body>
 </html>
