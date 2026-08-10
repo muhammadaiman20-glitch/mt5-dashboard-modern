@@ -1,12 +1,403 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>MT5 Account Dashboard</title>
-    <script type="module" crossorigin src="/mt5-dashboard-modern/assets/assets/index-CoKqJyc1.js"></script>
-    <link rel="stylesheet" crossorigin href="/mt5-dashboard-modern/assets/assets/index-ZHrWHcRi.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MT5 Account Dashboard</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    background:
+      radial-gradient(1200px 800px at 80% -10%, #1f2a3d 0%, transparent 60%),
+      radial-gradient(1000px 600px at -10% 30%, #2a1f3d 0%, transparent 60%),
+      #0b0f17;
+    color: #e6e9ef;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 20px 48px; }
+  .header {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: 14px;
+    background: linear-gradient(135deg, #1b2838, #24344f);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    border: 1px solid #2c3a52;
+  }
+  .brand .logo {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, #7c5cff, #4cc9ff);
+    display: grid; place-items: center; font-weight: 800; color: white;
+  }
+  .brand h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
+  .brand span { display: block; font-size: 12px; color: #a8b3c7; }
+
+  .card {
+    border-radius: 16px; padding: 18px 20px;
+    background: linear-gradient(180deg, #111827, #0f172a);
+    border: 1px solid #1f2a3d;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+
+  .stat .label { color: #a4acc4; font-size: 13px; }
+  .stat .value {
+    margin-top: 8px; font-size: 26px; font-weight: 800; letter-spacing: 0.3px;
+    background: linear-gradient(90deg, #fff, #c7d2fe);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .stat .sub { margin-top: 6px; font-size: 12px; color: #8a93a8; }
+
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  .chip {
+    padding: 8px 12px; border-radius: 999px;
+    background: #0f172a; border: 1px solid #243044; color: #c7d2fe; font-size: 12px;
+  }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { text-align: left; padding: 10px 8px; font-size: 13px; }
+  th { color: #8b95aa; font-weight: 600; }
+  tr + tr td { border-top: 1px solid #1f2a3d; }
+  .pill {
+    display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  }
+  .pill.buy { background: rgba(16,185,129,0.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.25); }
+  .pill.sell { background: rgba(248,113,113,0.15); color: #fca5a5; border: 1px solid rgba(248,113,113,0.25); }
+
+  .updated { margin-top: 18px; font-size: 12px; color: #6b7280; }
+  .banner {
+    margin-top: 14px; padding: 10px 14px; border-radius: 12px; font-size: 12px;
+    background: rgba(250,204,21,0.1); color: #fde68a; border: 1px solid rgba(250,204,21,0.25);
+    display: none;
+  }
+  .banner.show { display: block; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .btn {
+    padding: 10px 14px; border-radius: 12px; cursor: pointer;
+    background: #0f172a; color: #e6e9ef; border: 1px solid #2a3a52; font-weight: 600; font-size: 13px;
+  }
+  .btn:hover { background: #192033; }
+
+  .section-title { font-weight: 700; }
+  .section-sub { color: #8b95aa; font-size: 12px; margin-top: 2px; }
+
+  .levels { display: grid; gap: 16px; grid-template-columns: repeat(2, 1fr); margin-top: 16px; }
+  @media (max-width: 640px) { .levels { grid-template-columns: 1fr; } }
+  .level-box {
+    border-radius: 14px; padding: 16px;
+    border: 1px solid #1f2a3d;
+  }
+  .level-box.buy { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.25); }
+  .level-box.sell { background: rgba(248,113,113,0.08); border-color: rgba(248,113,113,0.25); }
+  .level-box .label { font-size: 13px; color: #a4acc4; }
+  .level-box .price { font-size: 24px; font-weight: 800; margin-top: 6px; }
+  .level-box.buy .price { color: #6ee7b7; }
+  .level-box.sell .price { color: #fca5a5; }
+
+  .meta-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
+  .meta-item { font-size: 12px; color: #8b95aa; }
+  .meta-item b { color: #e6e9ef; font-size: 13px; display: block; margin-top: 2px; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">
+        <div class="logo">MT</div>
+        <div>
+          <h1>MT5 Account Dashboard</h1>
+          <span id="brandSub">Live account &amp; next-candle prediction</span>
+        </div>
+      </div>
+      <div class="chips">
+        <div class="chip" id="chipLogin">Login: —</div>
+        <div class="chip" id="chipServer">Server: —</div>
+        <div class="chip" id="chipMagic">Magic: 20240701</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card stat">
+        <div class="label">Balance</div>
+        <div class="value" id="valBalance">—</div>
+        <div class="sub">Base account currency</div>
+      </div>
+      <div class="card stat">
+        <div class="label">Equity</div>
+        <div class="value" id="valEquity">—</div>
+        <div class="sub">Real-time mark-to-market</div>
+      </div>
+      <div class="card stat">
+        <div class="label">Profit</div>
+        <div class="value" id="valProfit">—</div>
+        <div class="sub">Open positions PnL</div>
+      </div>
+      <div class="card stat">
+        <div class="label">Symbol</div>
+        <div class="value" id="valSymbol">—</div>
+        <div class="sub">Trading instrument</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 18px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px; flex-wrap: wrap;">
+        <div>
+          <div class="section-title">Next Candle Prediction</div>
+          <div class="section-sub">Buy/sell limit levels derived from the last 5 OHLC candles</div>
+        </div>
+        <div class="actions">
+          <button class="btn" onclick="refresh()">Refresh</button>
+        </div>
+      </div>
+
+      <div class="banner" id="predictionBanner"></div>
+
+      <div class="levels">
+        <div class="level-box buy">
+          <div class="label">Buy Limit</div>
+          <div class="price" id="valBuyLimit">—</div>
+        </div>
+        <div class="level-box sell">
+          <div class="label">Sell Limit</div>
+          <div class="price" id="valSellLimit">—</div>
+        </div>
+      </div>
+
+      <div class="meta-row">
+        <div class="meta-item">Pivot <b id="metaPivot">—</b></div>
+        <div class="meta-item">ATR(5) <b id="metaAtr">—</b></div>
+        <div class="meta-item">Momentum <b id="metaMomentum">—</b></div>
+        <div class="meta-item">Predicted High <b id="metaHigh">—</b></div>
+        <div class="meta-item">Predicted Low <b id="metaLow">—</b></div>
+      </div>
+
+      <div style="overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Open</th>
+              <th>High</th>
+              <th>Low</th>
+              <th>Close</th>
+            </tr>
+          </thead>
+          <tbody id="candlesBody">
+            <tr><td colspan="5" style="color:#8b95aa;">No candle data loaded yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 18px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px; flex-wrap: wrap;">
+        <div>
+          <div class="section-title">Open Positions</div>
+          <div class="section-sub">Live state from MT5 bound positions</div>
+        </div>
+        <div class="actions">
+          <button class="btn" onclick="window.open('https://github.com/muhammadaiman20-glitch/mt5-dashboard-modern','_blank')">View Repo</button>
+        </div>
+      </div>
+      <div style="overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Ticket</th>
+              <th>Type</th>
+              <th>Volume</th>
+              <th>Open Price</th>
+              <th>Current SL</th>
+              <th>Current TP</th>
+              <th>Profit</th>
+            </tr>
+          </thead>
+          <tbody id="positionsBody">
+            <tr><td colspan="7" style="color:#8b95aa;">No positions loaded yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="updated" id="updated">Last updated: —</div>
+  </div>
+
+<script>
+function fmt(n, d=2){ return (n==null || isNaN(n)) ? '—' : Number(n).toLocaleString(undefined,{minimumFractionDigits:d, maximumFractionDigits:d}); }
+function fmtUSD(n){ return fmt(n, 2); }
+
+/*
+ * Buy-limit / sell-limit prediction from the last 5 OHLC candles.
+ * Mirrors prediction.py so the browser can compute the same result
+ * when no backend is reachable (e.g. static GitHub Pages hosting).
+ *
+ * 1. Recency-weighted pivot of typical price (H+L+2C)/4, weights 1..5.
+ * 2. ATR(5): average true range across the 5 candles (volatility).
+ * 3. Momentum: least-squares slope of closes, normalized by ATR(5),
+ *    clamped to [-1, 1].
+ * 4. Predicted next-candle range = pivot +/- k*ATR, skewed by momentum.
+ * 5. Buy/sell limits sit a fraction `beta` inside that range's edges.
+ */
+function predictLevels(candles, k = 0.5, alpha = 0.5, beta = 0.15) {
+  if (!candles || candles.length !== 5) {
+    throw new Error('predictLevels requires exactly 5 candles, oldest to newest');
+  }
+
+  const weights = [1, 2, 3, 4, 5];
+  const typical = candles.map(c => (c.high + c.low + 2 * c.close) / 4);
+  const weightSum = weights.reduce((a, b) => a + b, 0);
+  const pivot = weights.reduce((sum, w, i) => sum + w * typical[i], 0) / weightSum;
+
+  const trueRanges = candles.map((c, i) => {
+    if (i === 0) return c.high - c.low;
+    const prevClose = candles[i - 1].close;
+    return Math.max(c.high - c.low, Math.abs(c.high - prevClose), Math.abs(c.low - prevClose));
+  });
+  const atr = trueRanges.reduce((a, b) => a + b, 0) / trueRanges.length;
+
+  const closes = candles.map(c => c.close);
+  const n = closes.length;
+  const idx = closes.map((_, i) => i + 1);
+  const meanI = idx.reduce((a, b) => a + b, 0) / n;
+  const meanC = closes.reduce((a, b) => a + b, 0) / n;
+  const num = idx.reduce((sum, i, j) => sum + (i - meanI) * (closes[j] - meanC), 0);
+  const den = idx.reduce((sum, i) => sum + (i - meanI) ** 2, 0);
+  const slope = den ? num / den : 0;
+  const momentum = atr === 0 ? 0 : Math.max(-1, Math.min(1, slope / atr));
+
+  const predictedHigh = pivot + k * atr * (1 + alpha * Math.max(momentum, 0));
+  const predictedLow = pivot - k * atr * (1 + alpha * Math.max(-momentum, 0));
+  const range = Math.max(predictedHigh - predictedLow, 1e-9);
+
+  const buyLimit = predictedLow + beta * range;
+  const sellLimit = predictedHigh - beta * range;
+
+  return { pivot, atr, slope, momentum, predictedHigh, predictedLow, buyLimit, sellLimit };
+}
+
+function generateDemoCandles(n = 5, base = 2400) {
+  const candles = [];
+  let price = base;
+  for (let i = 0; i < n; i++) {
+    const o = price;
+    const h = o + (0.5 + Math.random() * 3.5);
+    const l = o - (0.5 + Math.random() * 3.5);
+    const c = l + Math.random() * (h - l);
+    candles.push({ open: o, high: h, low: l, close: c });
+    price = c;
+  }
+  return candles;
+}
+
+function renderAccount(d){
+  document.getElementById('valBalance').textContent = fmtUSD(d.balance);
+  document.getElementById('valEquity').textContent = fmtUSD(d.equity);
+  const p = d.profit ?? 0;
+  const el = document.getElementById('valProfit');
+  el.textContent = (p > 0 ? '+' : '') + fmtUSD(p);
+  el.style.color = p > 0 ? '#86efac' : (p < 0 ? '#fca5a5' : 'inherit');
+  document.getElementById('valSymbol').textContent = d.symbol || 'XAUUSD.m';
+  document.getElementById('chipLogin').textContent = 'Login: ' + (d.login || '—');
+  document.getElementById('chipServer').textContent = 'Server: ' + (d.server || '—');
+  const u = d.updated ? new Date(d.updated) : new Date();
+  document.getElementById('updated').textContent = 'Last updated: ' + u.toLocaleString();
+}
+
+function renderPositions(list){
+  const tbody = document.getElementById('positionsBody');
+  if (!list || !list.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:#8b95aa;">No open positions.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(p => {
+    const typeLabel = (String(p.type||'').toLowerCase().includes('buy')) ? 'BUY' : (String(p.type||'').toLowerCase().includes('sell') ? 'SELL' : String(p.type));
+    const cls = typeLabel.toLowerCase().includes('buy') ? 'buy' : 'sell';
+    return `<tr>
+      <td>${p.ticket ?? '—'}</td>
+      <td><span class="pill ${cls}">${typeLabel}</span></td>
+      <td>${fmt(p.volume, 2)}</td>
+      <td>${fmt(p.price_open, 5)}</td>
+      <td>${fmt(p.sl, 5)}</td>
+      <td>${fmt(p.tp, 5)}</td>
+      <td>${fmt(p.profit, 2)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderCandles(candles){
+  const tbody = document.getElementById('candlesBody');
+  tbody.innerHTML = candles.map((c, i) => `<tr>
+    <td>${i + 1}</td>
+    <td>${fmt(c.open, 2)}</td>
+    <td>${fmt(c.high, 2)}</td>
+    <td>${fmt(c.low, 2)}</td>
+    <td>${fmt(c.close, 2)}</td>
+  </tr>`).join('');
+}
+
+function renderPrediction(candles, levels){
+  document.getElementById('valBuyLimit').textContent = fmt(levels.buyLimit ?? levels.buy_limit, 2);
+  document.getElementById('valSellLimit').textContent = fmt(levels.sellLimit ?? levels.sell_limit, 2);
+  document.getElementById('metaPivot').textContent = fmt(levels.pivot, 2);
+  document.getElementById('metaAtr').textContent = fmt(levels.atr, 2);
+  document.getElementById('metaMomentum').textContent = fmt(levels.momentum, 3);
+  document.getElementById('metaHigh').textContent = fmt(levels.predictedHigh ?? levels.predicted_high, 2);
+  document.getElementById('metaLow').textContent = fmt(levels.predictedLow ?? levels.predicted_low, 2);
+  renderCandles(candles);
+}
+
+function setBanner(msg){
+  const el = document.getElementById('predictionBanner');
+  if (!msg) { el.classList.remove('show'); el.textContent = ''; return; }
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+async function loadPrediction(){
+  try {
+    const res = await fetch('/api/prediction');
+    if (!res.ok) throw new Error('no backend');
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
+    setBanner(null);
+    renderPrediction(d.candles, d);
+    return;
+  } catch (err) {
+    // No backend reachable (e.g. static GitHub Pages hosting) — compute
+    // the same formula client-side against demo candles instead.
+    const candles = generateDemoCandles();
+    const levels = predictLevels(candles);
+    setBanner('Demo data — connect a backend (app.py or test_mt5.py) for live MT5 candles.');
+    renderPrediction(candles, levels);
+  }
+}
+
+async function refresh(){
+  try {
+    const [a, p] = await Promise.all([
+      fetch('/api/account'),
+      fetch('/api/positions')
+    ]);
+    if (!a.ok || !p.ok) throw new Error('no backend');
+    const ad = await a.json();
+    const pd = await p.json();
+    if (ad.error) throw new Error(ad.error);
+    renderAccount(ad);
+    renderPositions(pd);
+  } catch (err) {
+    document.getElementById('updated').textContent = 'Last updated: — (no backend reachable, showing demo prediction only)';
+  }
+  await loadPrediction();
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
 </html>
