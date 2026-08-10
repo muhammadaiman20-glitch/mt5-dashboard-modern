@@ -1,4 +1,5 @@
 import datetime
+import os
 import random
 
 from flask import Flask, jsonify, send_from_directory
@@ -6,6 +7,8 @@ from flask import Flask, jsonify, send_from_directory
 from prediction import predict_levels
 
 app = Flask(__name__, static_folder=None)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def generate_demo_candles(n=5, base=2400.0):
@@ -54,7 +57,7 @@ def api_prediction():
 
 @app.get("/")
 def index():
-    return send_from_directory(".", "index.html")
+    return send_from_directory(BASE_DIR, "index.html")
 
 
 if __name__ == "__main__":

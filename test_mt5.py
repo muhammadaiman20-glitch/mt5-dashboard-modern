@@ -18,9 +18,13 @@ def mt5_connect():
         raise RuntimeError(
             "Set MT5_LOGIN, MT5_PASSWORD and MT5_SERVER environment variables before starting the server."
         )
+    try:
+        login_id = int(MT5_LOGIN)
+    except ValueError:
+        raise RuntimeError("MT5_LOGIN must be an integer account number")
     if not mt5.initialize():
         raise RuntimeError(f"MT5 initialize failed: {mt5.last_error()}")
-    if not mt5.login(int(MT5_LOGIN), MT5_PASSWORD, MT5_SERVER):
+    if not mt5.login(login_id, MT5_PASSWORD, MT5_SERVER):
         err = mt5.last_error()
         mt5.shutdown()
         raise RuntimeError(f"MT5 login failed: {err}")
@@ -50,6 +54,29 @@ def api_account():
             "equity": info.equity,
             "profit": info.profit,
         })
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        mt5.shutdown()
+
+
+@app.get("/api/positions")
+def api_positions():
+    try:
+        mt5_connect()
+        positions = mt5.positions_get(symbol=MT5_SYMBOL) or []
+        return jsonify([
+            {
+                "ticket": p.ticket,
+                "type": "BUY" if p.type == mt5.POSITION_TYPE_BUY else "SELL",
+                "volume": p.volume,
+                "price_open": p.price_open,
+                "sl": p.sl,
+                "tp": p.tp,
+                "profit": p.profit,
+            }
+            for p in positions
+        ])
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 500
     finally:

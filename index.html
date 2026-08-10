@@ -309,6 +309,12 @@ function renderAccount(d){
   document.getElementById('updated').textContent = 'Last updated: ' + u.toLocaleString();
 }
 
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
 function renderPositions(list){
   const tbody = document.getElementById('positionsBody');
   if (!list || !list.length) {
@@ -319,8 +325,8 @@ function renderPositions(list){
     const typeLabel = (String(p.type||'').toLowerCase().includes('buy')) ? 'BUY' : (String(p.type||'').toLowerCase().includes('sell') ? 'SELL' : String(p.type));
     const cls = typeLabel.toLowerCase().includes('buy') ? 'buy' : 'sell';
     return `<tr>
-      <td>${p.ticket ?? '—'}</td>
-      <td><span class="pill ${cls}">${typeLabel}</span></td>
+      <td>${escapeHtml(p.ticket ?? '—')}</td>
+      <td><span class="pill ${cls}">${escapeHtml(typeLabel)}</span></td>
       <td>${fmt(p.volume, 2)}</td>
       <td>${fmt(p.price_open, 5)}</td>
       <td>${fmt(p.sl, 5)}</td>
@@ -378,26 +384,41 @@ async function loadPrediction(){
   }
 }
 
+async function fetchJSON(url){
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('http_' + res.status);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
 async function refresh(){
+  // Account and positions are fetched independently: a backend (like
+  // test_mt5.py) that only implements some endpoints should still get
+  // to render whatever it does support, instead of an all-or-nothing UI.
+  let accountOk = false;
   try {
-    const [a, p] = await Promise.all([
-      fetch('/api/account'),
-      fetch('/api/positions')
-    ]);
-    if (!a.ok || !p.ok) throw new Error('no backend');
-    const ad = await a.json();
-    const pd = await p.json();
-    if (ad.error) throw new Error(ad.error);
-    renderAccount(ad);
-    renderPositions(pd);
+    renderAccount(await fetchJSON('/api/account'));
+    accountOk = true;
   } catch (err) {
+    // handled by the fallback message below
+  }
+  try {
+    renderPositions(await fetchJSON('/api/positions'));
+  } catch (err) {
+    // positions endpoint optional; leave table as-is
+  }
+  if (!accountOk) {
     document.getElementById('updated').textContent = 'Last updated: — (no backend reachable, showing demo prediction only)';
   }
   await loadPrediction();
 }
 
-refresh();
-setInterval(refresh, 5000);
+async function refreshLoop(){
+  await refresh();
+  setTimeout(refreshLoop, 5000);
+}
+refreshLoop();
 </script>
 </body>
 </html>
