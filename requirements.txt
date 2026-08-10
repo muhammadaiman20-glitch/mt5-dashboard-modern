@@ -1,0 +1,6 @@
+Flask>=3.0
+
+# Only needed to run test_mt5.py (the live backend). It requires the
+# MetaTrader5 terminal and only installs on Windows — app.py (the demo
+# backend) does not need it.
+MetaTrader5>=5.0.45

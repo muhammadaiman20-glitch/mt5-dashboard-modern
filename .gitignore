@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Real MT5 credentials live here, gitignored on purpose — see
+# mt5_credentials.example.bat for the template to copy it from.
+mt5_credentials.local.bat
+.env
